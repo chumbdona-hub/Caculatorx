@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chấm công &amp; Tính lương</title>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--tx:#1c2430;--mut:#667085;--bd:#e2e6ec;--pri:#2563eb;--ok:#15803d;--warn:#b45309;--bad:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151a;--card:#1b2028;--tx:#e8ecf2;--mut:#98a2b3;--bd:#2c3440;--pri:#5b8cff;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171}}
+:root[data-theme="dark"]{--bg:#12151a;--card:#1b2028;--tx:#e8ecf2;--mut:#98a2b3;--bd:#2c3440;--pri:#5b8cff;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:640px;margin:0 auto;padding:12px}
+h1{font-size:18px;margin:0}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input,select{padding:0 10px;height:44px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font-size:16px;min-width:0}
+.f{width:100%;margin-bottom:10px}
+button{font:inherit;cursor:pointer}
+.b{height:44px;padding:0 16px;border:1px solid var(--pri);background:var(--pri);color:#fff;border-radius:10px}
+.g{background:transparent;color:var(--tx);border-color:var(--bd)}
+.x{background:none;border:none;color:var(--bad);font-size:20px;width:40px;height:40px}
+.m{color:var(--mut);font-size:13px}
+.ok{color:var(--ok)}.warn{color:var(--warn)}
+.big{font-size:20px;font-weight:700}
+.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{flex:1;height:60px;border:none;background:none;color:var(--mut);font-size:12px}
+.tabs button.on{color:var(--pri);font-weight:700}
+.tabs span{display:block;font-size:20px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px}
+.chip{flex:none;padding:8px 12px;border:1px solid var(--bd);border-radius:99px;background:var(--card);color:var(--tx);font-size:14px;text-align:left}
+.chip.on{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 12%,transparent)}
+.day{border-top:1px solid var(--bd);padding:10px 0}
+.day:first-of-type{border-top:none}
+.sh{display:flex;gap:6px;align-items:center;margin:6px 0}
+.sh input{flex:1;padding:0 6px}
+.tag{font-size:12px;background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn);padding:2px 8px;border-radius:99px;margin-left:6px}
+.lock{font-size:12px;background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);padding:3px 9px;border-radius:99px}
+.note{background:color-mix(in srgb,var(--warn) 12%,transparent);border-radius:10px;padding:8px 10px;font-size:13px;margin-top:10px}
+.err{color:var(--bad);font-size:14px;min-height:20px}
+.xt{border-collapse:collapse;width:100%;min-width:620px;background:#fff;color:#111;font-size:13px;text-align:center}.xt th,.xt td{border:1.5px solid #333;padding:7px 4px;white-space:nowrap;font-weight:700}.xn{background:#dce6f1;white-space:normal!important}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+var typedU="",U=null,D=null,tab="sch",sel=null,month=ym(new Date()),mode="login",err="";
+var weekStart=monday(new Date());
+var DN=["Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7","Chủ nhật"];
+function ls(k,v){try{if(v===undefined){var s=localStorage.getItem(k);return s?JSON.parse(s):null}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+function sortE(){if(D)D.emps.sort(function(a,b){return (a.type=="ft"?0:1)-(b.type=="ft"?0:1)})}
+function save(){ls("cc_d_"+U,D)}
+function p2(n){return String(n).padStart(2,"0")}
+function fd(d){return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())}
+function ym(d){return d.getFullYear()+"-"+p2(d.getMonth()+1)}
+function monday(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-(x.getDay()+6)%7);return x}
+function addDays(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x}
+function vnd(n){return Math.round(n).toLocaleString("vi-VN")+"đ"}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function tm(s){var a=s.split(":");return +a[0]*60+ +a[1]}
+function mins(x){if(!x.s||!x.e)return 0;var a=tm(x.s),b=tm(x.e);if(b<=a)b+=1440;return b-a}
+function fh(m){var h=Math.floor(m/60),r=m%60;return h+"g"+(r?p2(r):"")}
+function emp(id){return D.emps.find(function(e){return e.id==id})}
+function shifts(id,k){return (D.sh[id]&&D.sh[id][k])||[]}
+function dayM(id,k){return shifts(id,k).reduce(function(a,x){return a+mins(x)},0)}
+function hash(pw,salt){var b=new TextEncoder().encode(salt+pw);return crypto.subtle.digest("SHA-256",b).then(function(h){return Array.from(new Uint8Array(h)).map(function(x){return p2(x.toString(16))}).join("")})}
+
+function login(u,rm){U=u;D=ls("cc_d_"+u)||{emps:[],sh:{},locked:{},extras:{}};ls("cc_last",u);if(rm===false){try{sessionStorage.setItem("cc_ss",u)}catch(e){}}else ls("cc_session",u);D.act=D.act||{};D.dir=D.dir||{};D.src=D.src||"sch";sortE();sel=D.emps[0]&&D.emps[0].id;render()}
+function auth(){
+  var u=document.getElementById("u").value.trim().toLowerCase(),p=document.getElementById("p").value,rmv=(document.getElementById("rm")||{checked:true}).checked;typedU=u;
+  var users=ls("cc_users")||{};
+  if(!u||p.length<4){err="Nhập tên đăng nhập và mật khẩu (từ 4 ký tự).";return render()}
+  if(mode=="reg"){
+    if(users[u]){err="Tên đăng nhập đã tồn tại.";return render()}
+    var salt=Math.random().toString(36).slice(2);
+    hash(p,salt).then(function(h){users[u]={salt:salt,h:h};ls("cc_users",users);err="";login(u,rmv)})
+  }else{
+    if(!users[u]){err="Không tìm thấy tài khoản.";return render()}
+    hash(p,users[u].salt).then(function(h){if(h!=users[u].h){err="Sai mật khẩu.";return render()}err="";login(u,rmv)})
+  }
+}
+
+function render(){
+  var a=document.getElementById("app");
+  if(!U){
+    a.innerHTML='<div class="card" style="margin-top:8vh"><h1 style="margin-bottom:4px">🕒 Chấm công &amp; Tính lương</h1><p class="m" style="margin-top:0">'+(mode=="reg"?"Tạo tài khoản mới":"Đăng nhập để tiếp tục")+'</p><input class="f" id="u" value="'+esc(typedU||(mode=="reg"?"":(ls("cc_last")||"")))+'" placeholder="Tên đăng nhập" autocapitalize="none" autocomplete="username"><input class="f" id="p" type="password" placeholder="Mật khẩu" autocomplete="'+(mode=="reg"?"new-password":"current-password")+'"><label class="row" style="margin-bottom:8px;gap:8px;cursor:pointer"><input type="checkbox" id="rm" checked style="width:20px;height:20px"> Ghi nhớ tài khoản trên thiết bị này</label><div class="err">'+err+'</div><button class="b f" data-act="auth">'+(mode=="reg"?"Tạo tài khoản":"Đăng nhập")+'</button><button class="b g f" data-act="mode" style="margin:0">'+(mode=="reg"?"Đã có tài khoản? Đăng nhập":"Chưa có tài khoản? Đăng ký")+'</button><p class="m">Tài khoản và dữ liệu được lưu ngay trên thiết bị này.</p></div>';
+    return;
+  }
+  if(showX){a.innerHTML=vExport();return}
+  if(showP){a.innerHTML=vSlip();return}
+  var v=tab=="emp"?vEmp():tab=="sch"?vSch():tab=="act"?vAct():vPay();
+  var T=[["emp","👥","Nhân viên"],["sch","📅","Lịch"],["act","📸","Chấm thật"],["pay","💰","Lương"]];
+  a.innerHTML='<div class="top"><h1>🕒 '+esc(U)+'</h1><button class="b g" data-act="out">Đăng xuất</button></div>'+v+'<div class="tabs">'+T.map(function(t){return '<button class="'+(tab==t[0]?"on":"")+'" data-tab="'+t[0]+'"><span>'+t[1]+'</span>'+t[2]+'</button>'}).join("")+'</div>';
+}
+
+function vEmp(){
+  var h='<div class="card"><b>Thêm nhân viên</b><input class="f" id="en" placeholder="Tên nhân viên" style="margin-top:8px"><div class="row" style="margin-bottom:10px"><select id="et" style="flex:1"><option value="pt">Part time</option><option value="ft">Full time</option></select><input id="er" type="number" inputmode="numeric" step="500" value="22000" style="flex:1"><span class="m">đ/giờ</span></div><button class="b f" data-act="addEmp" style="margin:0">Thêm</button></div><div class="card"><b>Danh sách (Full time xếp trên, Part time xếp dưới) ('+D.emps.length+')</b>';
+  if(!D.emps.length)h+='<p class="m">Chưa có nhân viên.</p>';
+  D.emps.forEach(function(e){h+='<div class="row" style="padding:8px 0;border-top:1px solid var(--bd)"><span style="flex:1;min-width:110px"><b>'+esc(e.name)+'</b><br><span class="m">'+(e.type=="ft"?"Full time":"Part time")+'</span></span><input type="number" inputmode="numeric" style="width:100px" step="500" value="'+e.rate+'" data-rate="'+e.id+'">'+(delAsk==e.id?'<button class="b" data-del="'+e.id+'" style="height:38px;font-size:14px;background:var(--bad);border-color:var(--bad)">Xác nhận xóa</button><button class="b g" data-delno="1" style="height:38px;font-size:14px">Hủy</button>':'<button class="b g" data-del="'+e.id+'" style="height:38px;font-size:14px;color:var(--bad);border-color:var(--bad)">Xóa</button>')+'</div>'});
+  return h+'</div>';
+}
+
+function vSch(){
+  var wk=fd(weekStart),lk=!!D.locked[wk],days=[];
+  for(var i=0;i<7;i++)days.push(addDays(weekStart,i));
+  var h='<div class="card"><div class="row" style="justify-content:space-between"><button class="b g" data-act="prev">‹</button><b>'+days[0].getDate()+"/"+(days[0].getMonth()+1)+" – "+days[6].getDate()+"/"+(days[6].getMonth()+1)+'</b><button class="b g" data-act="next">›</button></div><div class="row" style="justify-content:space-between;margin-top:10px">'+(lk?'<span class="lock">🔒 Đã chốt</span><button class="b g" data-act="unlock">Sửa lịch</button>':'<span class="m">Đang chỉnh sửa</span><button class="b" data-act="lock">Chốt tuần</button>')+'</div>';
+  var m0=ym(days[0]),m6=ym(days[6]);
+  if(m0!=m6){var c=days.filter(function(d){return ym(d)==m0}).length;h+='<div class="note">Tuần vắt qua 2 tháng: '+DN[0]+" → "+DN[c-1]+' tính lương tháng '+m0.slice(5)+', các ngày còn lại tính tháng '+m6.slice(5)+'.</div>'}
+  h+='</div>';
+  h+=vImp();
+  if(!D.emps.length)return h+'<div class="card m">Chưa có nhân viên. Thêm ở tab Nhân viên hoặc tải ảnh lịch làm ở trên.</div>';
+  h+='<div class="chips">'+D.emps.map(function(e){return '<button class="chip '+(e.id==sel?"on":"")+'" data-sel="'+e.id+'"><b>'+esc(e.name)+'</b></button>'}).join("")+'</div>';
+  var e=emp(sel)||D.emps[0];sel=e.id;var tot=0;
+  h+='<div class="card">';
+  days.forEach(function(d,i){
+    var k=fd(d),ss=shifts(e.id,k),dm=dayM(e.id,k);tot+=dm;
+    h+='<div class="day"><div class="row" style="justify-content:space-between"><b>'+DN[i]+' <span class="m">'+d.getDate()+'/'+(d.getMonth()+1)+'</span>'+(ss.length>1?'<span class="tag">Ca gãy</span>':'')+'</b><span class="'+(dm?"":"m")+'">'+(dm?fh(dm):"Nghỉ")+'</span></div>';
+    ss.forEach(function(x,j){h+='<div class="sh"><input type="time" value="'+x.s+'" data-t="'+k+'|'+j+'|s" '+(lk?"disabled":"")+'><span>→</span><input type="time" value="'+x.e+'" data-t="'+k+'|'+j+'|e" '+(lk?"disabled":"")+'>'+(lk?"":'<button class="x" data-rm="'+k+'|'+j+'">✕</button>')+'</div>'});
+    if(!lk)h+='<button class="b g" data-add="'+k+'" style="height:36px;font-size:14px">+ '+(ss.length?"Thêm ca (ca gãy)":"Thêm ca làm")+'</button>';
+    h+='</div>';
+  });
+  h+='<div class="row" style="justify-content:space-between;border-top:1px solid var(--bd);padding-top:10px"><b>Tổng tuần</b><span class="big">'+fh(tot)+'</span></div></div><button class="b f" data-act="xo" style="background:var(--ok);border-color:var(--ok)">📤 Xuất lịch tuần này (để chụp gửi nhóm)</button>';
+  return h;
+}
+
+function dlImg(){
+  var msg=document.getElementById("imgmsg"),el=document.getElementById("cap");
+  function say(t){if(msg)msg.textContent=t}
+  if(typeof html2canvas=="undefined"||!el)return say("Không tạo được hình. Kiểm tra mạng rồi thử lại.");
+  var name;
+  if(showP){var e=emp(showP);name="luong-"+e.name.trim().replace(/\s+/g,"-")+"-"+month.slice(5)+"-"+month.slice(0,4)+".png"}
+  else name="lich-lam-tuan-"+fd(weekStart)+".png";
+  say("Đang tạo hình...");
+  html2canvas(el,{scale:2,backgroundColor:"#ffffff"}).then(function(c){
+    c.toBlob(function(b){
+      if(!b)return say("Không tạo được hình.");
+      if(!window.claude||!window.claude.use)return say("Không thể tải file trong chế độ xem này.");
+      window.claude.use("downloads").then(function(dl){
+        if(!dl)return say("Không thể tải file trong chế độ xem này.");
+        return dl.save({filename:name,data:b}).then(function(){say("")},function(er){say(er&&er.code=="declined"?"":"Không lưu được hình ("+(er&&er.code||"lỗi")+").")});
+      });
+    },"image/png");
+  },function(){say("Không tạo được hình.")});
+}
+var showX=false;
+function vExport(){
+  var days=[],DS=["Th 2","Th 3","Th 4","Th 5","Th 6","Th 7","CN"];
+  for(var i=0;i<7;i++)days.push(addDays(weekStart,i));
+  function dm(d){return p2(d.getDate())+"/"+p2(d.getMonth()+1)}
+  function t(x){return x.replace(/^0/,"")}
+  var h='<div class="row" style="justify-content:space-between;margin-bottom:10px"><button class="b g" data-act="xc">‹ Quay lại</button><button class="b" data-act="dl" style="background:var(--ok);border-color:var(--ok)">⬇️ Tải hình ảnh</button><span class="m">Nên xoay ngang điện thoại để xem đủ bảng</span></div><div class="err" id="imgmsg"></div><div style="overflow-x:auto"><table class="xt" id="cap"><tr><th colspan="2" style="background:#fff;text-align:left;font-size:15px">LỊCH LÀM TUẦN '+dm(days[0])+' – '+dm(days[6])+'/'+days[6].getFullYear()+'</th>'+DS.map(function(x){return '<th style="background:#e8913a">'+x+'</th>'}).join("")+'</tr><tr><th style="background:#92d050">STT</th><th style="background:#92d050">HỌ VÀ TÊN</th>'+days.map(function(d){return '<th style="background:#f9cba0">'+dm(d)+'</th>'}).join("")+'</tr>';
+  D.emps.forEach(function(e,j){
+    h+='<tr><td>'+(j+1)+'</td><td class="xn">'+esc(e.name.toUpperCase())+'</td>';
+    days.forEach(function(d){var ss=shifts(e.id,fd(d)).filter(function(x){return x.s&&x.e});
+      h+=ss.length?'<td>'+ss.map(function(x){return t(x.s)+' - '+t(x.e)}).join('<br>')+'</td>':'<td style="background:#bfbfbf">OFF</td>'});
+    h+='</tr>';
+  });
+  return h+'</table></div>';
+}
+function ashifts(id,k){return (D.act[id]&&D.act[id][k])||[]}
+function shp(id,k){return D.src=="act"?ashifts(id,k):shifts(id,k)}
+function dayP(id,k){return shp(id,k).reduce(function(a,x){return a+mins(x)},0)}
+function vSrc(){function B(k,t){return '<button class="b'+(D.src==k?'':' g')+'" data-src="'+k+'" style="flex:1;min-width:100px;padding:0 8px">'+t+'</button>'}return '<div class="card"><div class="m" style="margin-bottom:6px">Cách tính giờ làm:</div><div class="row">'+B("sch","Từ lịch làm")+B("act","Từ chấm công thật")+B("dir","Nhập thẳng số giờ")+'</div></div>'}
+function useM(id,m){if(D.src!="dir")return m;var v=D.dir&&D.dir[id]&&D.dir[id][month];return Math.round((+v||0)*60)}
+function parseH(t){t=String(t||"").trim().replace(",",".");if(!t)return 0;if(t.indexOf(":")>=0){var a=t.split(":");return Math.max(0,(+a[0]||0)+(+a[1]||0)/60)}return Math.max(0,+t||0)}
+function dirIn(e){if(D.src!="dir")return "";var v=D.dir&&D.dir[e.id]&&D.dir[e.id][month];return '<div class="row" style="margin:8px 0"><span>Số giờ làm:</span><input type="text" inputmode="decimal" style="width:130px" placeholder="vd 82.5 hoặc 82:30" value="'+(v?v:"")+'" data-dir="'+e.id+'"><span class="m">giờ</span></div>'}
+function vAct(){
+  var h='<div class="card row"><b style="flex:1">Chấm công thật</b><input type="month" id="mo" value="'+month+'"></div>'+vSrc();
+  if(!D.emps.length)return h+'<div class="card m">Hãy thêm nhân viên trước.</div>';
+  var e=emp(sel)||D.emps[0];sel=e.id;
+  var y=+month.slice(0,4),mm=+month.slice(5)-1,n=new Date(y,mm+1,0).getDate(),tot=0;
+  h+='<div class="chips">'+D.emps.map(function(x){return '<button class="chip '+(x.id==sel?"on":"")+'" data-sel="'+x.id+'"><b>'+esc(x.name)+'</b></button>'}).join("")+'</div>';
+  h+='<div class="card"><b>Tải ảnh Timemark (tất cả nhân viên)</b><p class="m" style="margin:4px 0 8px">Chọn ảnh chốt cuối ca (Tan ca) trong tháng '+month.slice(5)+'/'+month.slice(0,4)+'. Hệ thống đọc <b>họ tên, ngày, giờ vào – giờ ra</b> in trên ảnh và tự xếp vào đúng nhân viên. Có thể chọn nhiều lần, ảnh được cộng dồn. Ngày làm ca gãy thì chọn ảnh của cả hai ca.</p><div class="m" style="margin-bottom:4px">Cách 1: chọn từ thư viện ảnh</div><input class="f" type="file" id="ph" accept="image/*" multiple style="padding:8px;height:auto"><div class="m" style="margin-bottom:4px">Cách 2: chọn từ Tệp / Files (xem được mọi thư mục, dùng khi Cách 1 không thấy ảnh Timemark)</div><input class="f" type="file" id="ph2" multiple style="padding:8px;height:auto"><div class="row" style="margin-bottom:8px"><span class="m" id="phinfo" style="flex:1">'+(PH.length?"Đã chọn "+PH.length+" ảnh":"Chưa chọn ảnh")+'</span><button class="b g" data-act="phc" style="height:34px;font-size:13px">Bỏ chọn</button></div><button class="b f" data-act="rd" style="margin:0">Đọc giờ từ ảnh</button><div class="err" id="phmsg" style="margin-top:6px"></div></div><div class="card"><b>Giờ chấm công thật — '+esc(e.name)+'</b><p class="m" style="margin:4px 0 0">Kiểm tra lại và sửa nếu ảnh đọc chưa đúng.</p>';
+  for(var i=1;i<=n;i++){
+    var d=new Date(y,mm,i),k=fd(d),ss=ashifts(e.id,k),dm=dayP0(e.id,k);tot+=dm;
+    h+='<div class="day"><div class="row" style="justify-content:space-between"><b>'+DN[(d.getDay()+6)%7]+' <span class="m">'+i+'/'+(mm+1)+'</span>'+(ss.length>1?'<span class="tag">Ca gãy</span>':'')+'</b><span class="'+(dm?"":"m")+'">'+(dm?fh(dm):"—")+'</span></div>';
+    ss.forEach(function(x,j){h+='<div class="sh"><input type="time" value="'+x.s+'" data-at="'+k+'|'+j+'|s"><span>→</span><input type="time" value="'+x.e+'" data-at="'+k+'|'+j+'|e"><button class="x" data-arm="'+k+'|'+j+'">✕</button></div>'});
+    h+='<button class="b g" data-aadd="'+k+'" style="height:34px;font-size:13px">+ Thêm ca</button></div>';
+  }
+  return h+'<div class="row" style="justify-content:space-between;border-top:1px solid var(--bd);padding-top:10px"><b>Tổng giờ thật</b><span class="big">'+fh(tot)+'</span></div></div>';
+}
+function dayP0(id,k){return ashifts(id,k).reduce(function(a,x){return a+mins(x)},0)}
+var PH=[];
+function nrm(x){return String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/gi,"d").toLowerCase().replace(/[^a-z0-9 ]+/g," ").replace(/\s+/g," ").trim()}
+function findEmp(nm){var a=nrm(nm);if(!a)return null;return D.emps.find(function(e){var b=nrm(e.name);return b==a||b.indexOf(a)>=0||a.indexOf(b)>=0})||null}
+function phInfo(){var el=document.getElementById("phinfo");if(el)el.textContent=PH.length?"Đã chọn "+PH.length+" ảnh":"Chưa chọn ảnh"}
+function readPhotos(){
+  var files=PH.slice(),msg=document.getElementById("phmsg");
+  function say(t){var m=document.getElementById("phmsg");if(m)m.textContent=t}
+  if(!files.length)return say("Hãy chọn ảnh trước.");
+  if(!window.claude||!window.claude.use)return say("Chế độ xem này chưa hỗ trợ đọc ảnh.");
+  say("Đang chuẩn bị...");
+  window.claude.use("sample").then(function(sample){
+    if(!sample)return say("Chế độ xem này chưa hỗ trợ đọc ảnh.");
+    return sample.limits().then(function(L){
+      if(!L.images)return say("Chế độ xem này chưa hỗ trợ đọc ảnh.");
+      var mc=Math.min(L.images.maxCount,6),bt=[],got=[],bad=0,idx=0,miss={},i;
+      for(i=0;i<files.length;i+=mc)bt.push(files.slice(i,i+mc));
+      function finish(note){
+        var by={},n=0;
+        got.forEach(function(g){var k=g.id+"|"+g.d;(by[k]=by[k]||[]).push(g)});
+        Object.keys(by).forEach(function(k){
+          var q=k.split("|"),seen={},list=[];
+          by[k].sort(function(a,b){return a.s<b.s?-1:1}).forEach(function(g){var u=g.s+g.e;if(!seen[u]){seen[u]=1;list.push({s:g.s,e:g.e})}});
+          D.act[q[0]]=D.act[q[0]]||{};D.act[q[0]][q[1]]=list;n++;
+        });
+        var names=Object.keys(miss);
+        save();if(!note)PH=[];render();
+        var m2=document.getElementById("phmsg");
+        if(m2)m2.textContent=(note||"")+"Đã điền "+n+" ngày công."+(bad?" Có "+bad+" ảnh không đọc được, thiếu giờ ra hoặc ngoài tháng.":"")+(names.length?" Không khớp nhân viên nào: "+names.join(", ")+" (hãy thêm nhân viên hoặc sửa tên cho khớp).":"");
+      }
+      function next(){
+        if(idx>=bt.length)return finish("");
+        var b=bt[idx++];
+        say("Đang đọc ảnh "+Math.min(idx*mc,files.length)+"/"+files.length+"...");
+        var pr="Có "+b.length+" ảnh, theo thứ tự ảnh 1 đến "+b.length+". Tên file theo thứ tự (chỉ để đối chiếu): "+b.map(function(x,q){return (q+1)+") "+x.name}).join("; ")+". Đây là ảnh chấm công Timemark. Với mỗi ảnh hãy đọc: name = họ tên ở dòng \"Họ tên\"; date = ngày in trên ảnh; start và end = giờ bắt đầu và giờ kết thúc ở thanh xanh phía dưới ảnh (dạng 08:01 – 18:02), dùng giờ 24h. Nếu ảnh chỉ có một mốc giờ (chưa có giờ ra) thì end là null. Tháng cần chấm công là "+month.slice(5)+"/"+month.slice(0,4)+". Chỉ trả về một mảng JSON đúng "+b.length+" phần tử theo thứ tự ảnh, mỗi phần tử dạng {\"name\":\"KHÁNH AN\",\"date\":\"YYYY-MM-DD\",\"start\":\"HH:MM\",\"end\":\"HH:MM\"}. Nếu không đọc chắc chắn được ảnh nào thì phần tử đó là null.";
+        return sample.json(pr,{images:b}).then(function(arr){
+          arr=Array.isArray(arr)?arr:[];
+          for(var q=0;q<b.length;q++){
+            var r=arr[q],T=/^\d{1,2}:\d{2}$/;
+            if(!(r&&/^\d{4}-\d{2}-\d{2}$/.test(r.date||"")&&T.test(r.start||"")&&T.test(r.end||"")&&r.date.slice(0,7)==month)){bad++;continue}
+            var e=findEmp(r.name);
+            if(!e){miss[r.name||"?"]=1;bad++;continue}
+            function hm(x){return p2(+x.split(":")[0])+":"+x.split(":")[1]}
+            got.push({id:e.id,d:r.date,s:hm(r.start),e:hm(r.end)});
+          }
+          return next();
+        });
+      }
+      return next().catch(function(er){
+        var c=er&&er.code,t=c=="not_granted"?"Bạn chưa cho phép đọc ảnh. ":c=="rate_limited"?"Đã dùng quá nhiều lượt, thử lại sau. ":c=="image_rejected"?"Có ảnh không hợp lệ hoặc quá lớn. ":"Lỗi khi đọc ảnh, hãy thử ít ảnh hơn. ";
+        if(got.length)finish(t);else say(t);
+      });
+    });
+  }).catch(function(){say("Không đọc được ảnh, hãy thử lại.")});
+}
+var PL=[],plOpen=false;
+function plInfo(){var el=document.getElementById("plinfo");if(el)el.textContent=PL.length?"Đã chọn "+PL.length+" ảnh lịch":"Chưa chọn ảnh"}
+function hm2(x){var a=String(x).split(":");return p2(+a[0])+":"+a[1]}
+function titleCase(n){return n.toLowerCase().split(/\s+/).map(function(w){return w.charAt(0).toUpperCase()+w.slice(1)}).join(" ")}
+function dateOf(t){
+  var m=/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/.exec(String(t||"").trim());if(!m)return null;
+  var dd=+m[1],mo=+m[2];if(mo<1||mo>12||dd<1||dd>31)return null;
+  if(m[3])return new Date(+m[3],mo-1,dd);
+  var ref=new Date(+month.slice(0,4),+month.slice(5)-1,15),best=null,bd=1e15;
+  [-1,0,1].forEach(function(o){var d=new Date(ref.getFullYear()+o,mo-1,dd),df=Math.abs(d-ref);if(df<bd){bd=df;best=d}});
+  return best;
+}
+function vImp(){
+  var h='<button class="b f" data-act="plt" style="margin-bottom:12px">📷 '+(plOpen?"Đóng phần tải ảnh lịch":"Tải ảnh lịch làm (tự tạo lịch và lương)")+'</button>';
+  if(plOpen)h+='<div class="card"><p class="m" style="margin:0 0 8px">Chọn tất cả ảnh bảng lịch làm (mỗi ảnh là lịch một tuần như mẫu). Hệ thống tự thêm nhân viên chưa có (mặc định <b>part time, 22.000đ/giờ</b>, ai full time thì chỉnh lại ở tab Nhân viên), điền giờ làm vào đúng ngày và tính lương ở tab Lương. Ngày ghi OFF sẽ để nghỉ.</p><div class="m" style="margin-bottom:4px">Cách 1: chọn từ thư viện ảnh</div><input class="f" type="file" id="pl" accept="image/*" multiple style="padding:8px;height:auto"><div class="m" style="margin-bottom:4px">Cách 2: chọn từ Tệp / Files</div><input class="f" type="file" id="pl2" multiple style="padding:8px;height:auto"><div class="row" style="margin-bottom:8px"><span class="m" id="plinfo" style="flex:1">'+(PL.length?"Đã chọn "+PL.length+" ảnh lịch":"Chưa chọn ảnh")+'</span><button class="b g" data-act="plc" style="height:34px;font-size:13px">Bỏ chọn</button></div><button class="b f" data-act="pli" style="margin:0">Tạo lịch từ ảnh</button><div class="err" id="plmsg" style="margin-top:6px"></div></div>';
+  return h;
+}
+function importSch(){
+  var files=PL.slice();
+  function say(t){var m=document.getElementById("plmsg");if(m)m.textContent=t}
+  if(!files.length)return say("Hãy chọn ảnh lịch trước.");
+  if(!window.claude||!window.claude.use)return say("Chế độ xem này chưa hỗ trợ đọc ảnh.");
+  say("Đang chuẩn bị...");
+  window.claude.use("sample").then(function(sample){
+    if(!sample)return say("Chế độ xem này chưa hỗ trợ đọc ảnh.");
+    return sample.limits().then(function(L){
+      if(!L.images)return say("Chế độ xem này chưa hỗ trợ đọc ảnh.");
+      var idx=0,cells=0,emps={},created=[],firstD=null,bad=0,seq=0;
+      function apply(r){
+        var ds=(r&&Array.isArray(r.dates)?r.dates:[]).map(dateOf),rows=r&&Array.isArray(r.rows)?r.rows:[];
+        if(!ds.length||!rows.length){bad++;return}
+        rows.forEach(function(row){
+          var nm=String(row&&row.name||"").trim();if(!nm)return;
+          var e=findEmp(nm);
+          if(!e){e={id:Date.now()+(++seq),name:titleCase(nm),type:"pt",rate:22000};D.emps.push(e);created.push(e.name)}
+          emps[e.id]=1;D.sh[e.id]=D.sh[e.id]||{};
+          ds.forEach(function(d,j){
+            if(!d)return;
+            var k=fd(d),list=((row.days&&row.days[j])||[]).filter(function(x){return x&&/^\d{1,2}:\d{2}$/.test(x.s||"")&&/^\d{1,2}:\d{2}$/.test(x.e||"")}).map(function(x){return{s:hm2(x.s),e:hm2(x.e)}});
+            if(list.length)D.sh[e.id][k]=list;else delete D.sh[e.id][k];
+            cells++;if(!firstD||d<firstD)firstD=d;
+          });
+        });
+      }
+      function done(note){
+        sortE();save();
+        if(firstD){weekStart=monday(firstD);month=ym(firstD)}
+        if(!sel&&D.emps[0])sel=D.emps[0].id;
+        if(!note)PL=[];
+        plOpen=true;tab="sch";render();
+        var m=document.getElementById("plmsg");
+        if(m)m.textContent=(note||"")+"Đã cập nhật lịch cho "+Object.keys(emps).length+" nhân viên ("+cells+" ô ngày)."+(created.length?" Đã thêm mới (part time, 22.000đ/giờ): "+created.join(", ")+".":"")+(bad?" Có "+bad+" ảnh không đọc được.":"")+" Xem lương ở tab Lương.";
+      }
+      function next(){
+        if(idx>=files.length)return done("");
+        var f=files[idx++];
+        say("Đang đọc ảnh lịch "+idx+"/"+files.length+"...");
+        var pr="Đây là ảnh bảng lịch làm việc của nhân viên trong một tuần. Hàng tiêu đề có các cột Th 2 đến CN, ngay dưới là ngày dạng dd/mm. Mỗi hàng là một nhân viên (cột họ và tên). Mỗi ô là giờ làm dạng 8:00 - 14:00; ô có hai dòng giờ là ca gãy (hai ca); ô ghi OFF hoặc để trống là nghỉ. Bỏ qua tiêu đề tháng ở đầu bảng, chỉ dùng ngày ở hàng ngày. Dùng giờ 24h. Chỉ trả về JSON dạng {\"dates\":[\"28/09\",\"29/09\"],\"rows\":[{\"name\":\"NGUYỄN THỊ NHUNG\",\"days\":[[{\"s\":\"08:00\",\"e\":\"14:00\"}],[]]}]}. dates có đúng một phần tử cho mỗi cột ngày theo thứ tự từ trái sang phải; days của mỗi hàng có cùng số phần tử với dates, ngày nghỉ là mảng rỗng. Đọc thật chính xác từng giờ.";
+        return sample.json(pr,{images:[f]}).then(function(r){apply(r);return next()});
+      }
+      return next().catch(function(er){
+        var c=er&&er.code,t=c=="not_granted"?"Bạn chưa cho phép đọc ảnh. ":c=="rate_limited"?"Đã dùng quá nhiều lượt, thử lại sau. ":c=="image_rejected"?"Có ảnh không hợp lệ hoặc quá lớn. ":c=="invalid_json"?"Không đọc được bảng lịch trong một ảnh. ":"Lỗi khi đọc ảnh, hãy thử ít ảnh hơn. ";
+        if(cells)done(t);else say(t);
+      });
+    });
+  }).catch(function(){say("Không đọc được ảnh, hãy thử lại.")});
+}
+var showP=null,delAsk=null;
+function vSlip(){
+  var e=emp(showP);if(!e){showP=null;return ""}
+  var y=+month.slice(0,4),mm=+month.slice(5)-1,n=new Date(y,mm+1,0).getDate(),m=0;
+  for(var i=1;i<=n;i++)m+=dayP(e.id,fd(new Date(y,mm,i)));m=useM(e.id,m);
+  var xs=((D.extras[e.id]&&D.extras[e.id][month])||[]).filter(function(x){return x.n||+x.a}),tot=Math.round(m/60*e.rate);
+  function N(v){return Math.round(v).toLocaleString("en-US")}
+  function R(l,v){return '<tr><td style="text-align:left">'+l+'</td><td style="text-align:right">'+v+'</td></tr>'}
+  var h='<div class="row" style="justify-content:space-between;margin-bottom:10px"><button class="b g" data-act="xc">‹ Quay lại</button><button class="b" data-act="dl" style="background:var(--ok);border-color:var(--ok)">⬇️ Tải hình ảnh</button></div><div class="err" id="imgmsg"></div><table class="xt" id="cap" style="min-width:0;max-width:380px;margin:0 auto;font-size:18px"><tr><th colspan="2" style="background:#fff;color:#d00;font-size:20px;padding:10px">'+esc(e.name.toUpperCase())+'<div style="font-size:12px;color:#555;font-weight:600">Lương tháng '+month.slice(5)+'/'+month.slice(0,4)+'</div></th></tr>';
+  h+=R("Số giờ",Math.round(m/60*100)/100)+R("Lương 1h",N(e.rate));
+  xs.forEach(function(x){tot+=+x.a||0;h+=R(esc(x.n||"Khoản khác"),N(+x.a||0))});
+  return h+R("Thực",N(tot))+'</table>';
+}
+function vPay(){
+  var h='<div class="card row"><b style="flex:1">Lương tháng</b><input type="month" id="mo" value="'+month+'"></div>'+vSrc()+(D.emps.length?'<button class="b f" data-act="xl" style="background:var(--ok);border-color:var(--ok);color:#fff">📥 Xuất Excel tháng '+month.slice(5)+'/'+month.slice(0,4)+'</button><div class="err" id="xlmsg"></div>':''),grand=0;
+  var y=+month.slice(0,4),mm=+month.slice(5)-1,n=new Date(y,mm+1,0).getDate();
+  D.emps.forEach(function(e){
+    var m=0;for(var i=1;i<=n;i++)m+=dayP(e.id,fd(new Date(y,mm,i)));m=useM(e.id,m);
+    var base=m/60*e.rate,ex=(D.extras[e.id]&&D.extras[e.id][month])||[],sx=0;
+    ex.forEach(function(x){sx+=+x.a||0});grand+=base+sx;
+    h+='<div class="card"><div class="row"><b style="flex:1">'+esc(e.name)+'<br><span class="m">'+(e.type=="ft"?"Full time":"Part time")+'</span></b><span class="big">'+vnd(base+sx)+'</span></div>'+dirIn(e)+'<p class="m" style="margin:6px 0 10px">'+fh(m)+' × '+vnd(e.rate)+'/giờ = <b>'+vnd(base)+'</b></p>';
+    ex.forEach(function(x,i){h+='<div class="row" style="margin-bottom:8px;flex-wrap:nowrap"><input placeholder="Tên khoản (thưởng...)" value="'+esc(x.n)+'" data-xn="'+e.id+'|'+i+'" style="flex:1"><input type="number" inputmode="numeric" style="width:110px" value="'+(x.a||"")+'" data-xa="'+e.id+'|'+i+'" placeholder="Số tiền"><button class="x" data-xd="'+e.id+'|'+i+'">✕</button></div>'});
+    h+='<div class="row"><button class="b g" data-xadd="'+e.id+'" style="height:38px;font-size:14px">+ Thêm khoản tiền khác</button><button class="b" data-slip="'+e.id+'" style="height:38px;font-size:14px;background:var(--ok);border-color:var(--ok)">📤 Xuất bảng lương</button></div></div>';
+  });
+  if(!D.emps.length)return h+'<div class="card m">Chưa có nhân viên.</div>';
+  return h+'<div class="card row"><b style="flex:1">Tổng chi tháng '+month.slice(5)+'/'+month.slice(0,4)+'</b><span class="big ok">'+vnd(grand)+'</span></div>';
+}
+
+function exportXl(){
+  var msg=document.getElementById("xlmsg");
+  function say(t){if(msg)msg.textContent=t}
+  if(typeof XLSX=="undefined"){return say("Không tải được thư viện Excel. Kiểm tra mạng rồi thử lại.")}
+  var y=+month.slice(0,4),mm=+month.slice(5)-1,n=new Date(y,mm+1,0).getDate(),E=D.emps;
+  var head=["Ngày","Thứ"].concat(E.map(function(e){return e.name})),sch=[head],tot=E.map(function(){return 0});
+  for(var i=1;i<=n;i++){
+    var d=new Date(y,mm,i),k=fd(d),r=[p2(i)+"/"+p2(mm+1)+"/"+y,DN[(d.getDay()+6)%7]];
+    E.forEach(function(e,j){var ss=shp(e.id,k).filter(function(x){return x.s&&x.e});tot[j]+=dayP(e.id,k);
+      r.push(ss.length?ss.map(function(x){return x.s+" - "+x.e}).join(" | ")+(ss.length>1?" (ca gãy)":""):"")});
+    sch.push(r);
+  }
+  E.forEach(function(e,j){tot[j]=useM(e.id,tot[j])});
+  sch.push(["Tổng giờ","" ].concat(tot.map(function(m){return Math.round(m/60*100)/100})));
+  var mx=0;E.forEach(function(e){var x=(D.extras[e.id]&&D.extras[e.id][month])||[];if(x.length>mx)mx=x.length});
+  var pay=[["Bảng lương tháng "+p2(mm+1)+"/"+y].concat(E.map(function(e){return e.name}))];
+  var typ=["Loại"],rate=["Lương/giờ (đ)"],hrs=["Tổng giờ làm"],base=["Tiền lương giờ làm (đ)"],sum=["TỔNG CỘNG (đ)"],ex=[];
+  for(var q=0;q<mx;q++)ex.push(["Khoản khác "+(q+1)+" - tên"],["Khoản khác "+(q+1)+" - tiền (đ)"]);
+  E.forEach(function(e,j){
+    var h=Math.round(tot[j]/60*100)/100,b=Math.round(tot[j]/60*e.rate),xs=(D.extras[e.id]&&D.extras[e.id][month])||[],sx=0;
+    typ.push(e.type=="ft"?"Full time":"Part time");rate.push(e.rate);hrs.push(h);base.push(b);
+    for(var q2=0;q2<mx;q2++){var x=xs[q2];ex[q2*2].push(x?x.n:"");ex[q2*2+1].push(x?(+x.a||0):"");if(x)sx+=+x.a||0}
+    sum.push(b+sx);
+  });
+  pay=pay.concat([typ,rate,hrs,base],ex,[sum]);
+  var wb=XLSX.utils.book_new(),s1=XLSX.utils.aoa_to_sheet(sch),s2=XLSX.utils.aoa_to_sheet(pay);
+  s1["!cols"]=[{wch:12},{wch:10}].concat(E.map(function(){return{wch:26}}));
+  s2["!cols"]=[{wch:28}].concat(E.map(function(){return{wch:18}}));
+  if(D.src!="dir")XLSX.utils.book_append_sheet(wb,s1,D.src=="act"?"Chấm công thật":"Lịch làm");XLSX.utils.book_append_sheet(wb,s2,"Bảng lương");
+  var buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  if(!window.claude||!window.claude.use)return say("Không thể tải file trong chế độ xem này.");
+  window.claude.use("downloads").then(function(dl){
+    if(!dl)return say("Không thể tải file trong chế độ xem này.");
+    return dl.save({filename:"cham-cong-thang-"+p2(mm+1)+"-"+y+".xlsx",data:buf}).then(function(){say("")},function(er){say(er&&er.code=="declined"?"":"Không lưu được file ("+(er&&er.code||"lỗi")+").")});
+  });
+}
+document.addEventListener("click",function(ev){
+  var b=ev.target.closest("button");if(!b)return;var a=b.dataset;
+  if(a.act=="xl")return exportXl();
+  if(a.act=="dl")return dlImg();
+  if(a.act=="rd")return readPhotos();
+  if(a.act=="phc"){PH=[];return render()}
+  if(a.act=="plt"){plOpen=!plOpen;return render()}
+  if(a.act=="plc"){PL=[];return render()}
+  if(a.act=="pli")return importSch();
+  if(a.act=="xo"){showX=true;window.scrollTo(0,0);return render()}
+  if(a.slip){showP=+a.slip;window.scrollTo(0,0);return render()}
+  if(a.act=="xc"){showX=false;showP=null;return render()}
+  if(a.act=="auth")return auth();
+  if(a.act=="mode"){mode=mode=="reg"?"login":"reg";err="";return render()}
+  if(a.act=="out"){U=null;D=null;ls("cc_session",null);try{sessionStorage.removeItem("cc_ss")}catch(e){}typedU="";return render()}
+  if(a.tab)tab=a.tab;
+  else if(a.sel)sel=+a.sel;
+  else if(a.act=="addEmp"){var nm=document.getElementById("en").value.trim();if(!nm)return;var id=Date.now();D.emps.push({id:id,name:nm,type:document.getElementById("et").value,rate:+document.getElementById("er").value||0});sortE();sel=sel||id}
+  else if(a.delno){delAsk=null}
+  else if(a.del){if(delAsk!=a.del){delAsk=a.del;return render()}delAsk=null;D.emps=D.emps.filter(function(e){return e.id!=a.del});delete D.sh[a.del];delete D.extras[a.del];if(sel==a.del)sel=D.emps[0]&&D.emps[0].id}
+  else if(a.act=="prev")weekStart=addDays(weekStart,-7);
+  else if(a.act=="next")weekStart=addDays(weekStart,7);
+  else if(a.act=="lock")D.locked[fd(weekStart)]=true;
+  else if(a.act=="unlock")delete D.locked[fd(weekStart)];
+  else if(a.add){D.sh[sel]=D.sh[sel]||{};var l=D.sh[sel][a.add]=D.sh[sel][a.add]||[];l.push(l.length?{s:"18:00",e:"22:00"}:{s:"08:00",e:"17:00"})}
+  else if(a.rm){var q=a.rm.split("|");D.sh[sel][q[0]].splice(+q[1],1)}
+  else if(a.xadd){var id2=a.xadd;D.extras[id2]=D.extras[id2]||{};(D.extras[id2][month]=D.extras[id2][month]||[]).push({n:"",a:0})}
+  else if(a.xd){var r=a.xd.split("|");D.extras[r[0]][month].splice(+r[1],1)}
+  else if(a.src){D.src=a.src}
+  else if(a.aadd){D.act[sel]=D.act[sel]||{};(D.act[sel][a.aadd]=D.act[sel][a.aadd]||[]).push({s:"",e:""})}
+  else if(a.arm){var w=a.arm.split("|");D.act[sel][w[0]].splice(+w[1],1)}
+  else return;
+  save();render();
+});
+document.addEventListener("change",function(ev){
+  var t=ev.target,a=t.dataset;if(!U)return;
+  if(t.id=="pl"||t.id=="pl2"){Array.from(t.files||[]).forEach(function(x){if(!/^image\//.test(x.type)&&!/\.(jpe?g|png|webp|heic)$/i.test(x.name))return;if(!PL.some(function(y){return y.name==x.name&&y.size==x.size&&y.lastModified==x.lastModified}))PL.push(x)});t.value="";plInfo();return}
+  if(t.id=="ph"||t.id=="ph2"){Array.from(t.files||[]).forEach(function(x){if(!/^image\//.test(x.type)&&!/\.(jpe?g|png|webp|heic)$/i.test(x.name))return;if(!PH.some(function(y){return y.name==x.name&&y.size==x.size&&y.lastModified==x.lastModified}))PH.push(x)});t.value="";phInfo();return}
+  if(t.id=="et"){document.getElementById("er").value=t.value=="ft"?25000:22000;return}
+  if(t.id=="mo"){if(t.value)month=t.value;return render()}
+  if(a.rate)emp(a.rate).rate=+t.value||0;
+  else if(a.t){var q=a.t.split("|");D.sh[sel][q[0]][+q[1]][q[2]]=t.value}
+  else if(a.xn){var r=a.xn.split("|");D.extras[r[0]][month][+r[1]].n=t.value}
+  else if(a.xa){var r2=a.xa.split("|");D.extras[r2[0]][month][+r2[1]].a=+t.value||0}
+  else if(a.dir){D.dir=D.dir||{};D.dir[a.dir]=D.dir[a.dir]||{};D.dir[a.dir][month]=parseH(t.value)}
+  else if(a.at){var w2=a.at.split("|");D.act[sel][w2[0]][+w2[1]][w2[2]]=t.value}
+  else return;
+  save();render();
+});
+document.addEventListener("keydown",function(e){if(e.key=="Enter"&&!U&&e.target.tagName=="INPUT")auth()});
+var s0=ls("cc_session")||(function(){try{return sessionStorage.getItem("cc_ss")}catch(e){return null}})();if(s0&&(ls("cc_users")||{})[s0])login(s0,!!ls("cc_session"));else render();
+</script>
+</body>
+</html>
